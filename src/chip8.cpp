@@ -1,6 +1,7 @@
 #include "chip8.h"
 #include <fstream>
 #include <iostream>
+#include <cstdlib>
 
 // Fontset: angka 0-F dalam bentuk sprite 4x5 pixel
 // Setiap karakter butuh 5 byte, tiap byte 1 baris (4 bit kiri)
@@ -75,8 +76,12 @@ void Chip8::cycle() {
         case 0x0000:
             switch (opcode & 0x00FF) {
                 case 0x00E0:
-                video.fill(0);
-                break;
+                    video.fill(0);
+                    break;
+                case 0x00EE:  // RET: return from subroutine
+                    sp--;
+                    pc = stack[sp];
+                    break;
             }
             break;
         case 0x1000:
@@ -87,6 +92,39 @@ void Chip8::cycle() {
             sp++;
             pc = opcode & 0x0FFF;
             break;
+        case 0x3000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            uint8_t NN = opcode & 0x00FF;
+            //if (V[X] == NN) pc += 2;
+            bool skip = (V[X] == NN);
+        if (skip) pc += 2;
+        // std::cout << "3XNN: V" << (int)X << "=" << (int)V[X]
+        //         << " NN=" << (int)NN
+        //         << " -> " << (skip ? "SKIP" : "no skip") << "\n";
+            break;
+        }
+        case 0x4000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            uint8_t NN = opcode & 0x00FF;
+            //if (V[X] != NN) pc += 2;
+            bool skip = (V[X] != NN);
+            if (skip) pc += 2;
+            // std::cout << "4XNN: V" << (int)X << "=" << (int)V[X]
+            //         << " NN=" << (int)NN
+            //         << " -> " << (skip ? "SKIP" : "no skip") << "\n";
+            break;
+        }
+        case 0x5000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            uint8_t Y = (opcode & 0x00F0) >> 4;
+            //if (V[X] == V[Y]) pc += 2;
+            bool skip = (V[X] == V[Y]);
+            if (skip) pc += 2;
+            // std::cout << "5XY0: V" << (int)X << "=" << (int)V[X]
+            //         << " V" << (int)Y << "=" << (int)V[Y]
+            //         << " -> " << (skip ? "SKIP" : "no skip") << "\n";
+            break;
+        }
         case 0x6000: {
             uint8_t X = (opcode & 0x0F00) >> 8;
             uint8_t NN = opcode & 0x00FF;
@@ -99,9 +137,77 @@ void Chip8::cycle() {
             V[X] += NN;
             break;
         }
+        case 0x8000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            uint8_t Y = (opcode & 0x00F0) >> 4;
+            uint8_t N = opcode & 0x000F;
+            // uint8_t beforeX = V[X];
+            // uint8_t beforeY = V[Y];
+            switch (N) {
+                case 0x0:
+                    V[X] = V[Y];
+                    break;
+                case 0x1:
+                    V[X] |= V[Y];
+                    break;
+                case 0x2:
+                    V[X] &= V[Y];
+                    break;
+                case 0x3:
+                    V[X] ^= V[Y];
+                    break;
+                case 0x4: {
+                    uint16_t sum = V[X] + V[Y];
+                    V[0xF] = (sum > 255) ? 1 : 0;
+                    V[X] = sum & 0xFF;
+                    break; 
+                }
+                case 0x5: 
+                    V[0xF] = (V[X] >= V[Y]) ? 1 : 0;
+                    V[X] -= V[Y];
+                    break;
+                case 0x6:
+                    V[0xF] = V[X] & 1;
+                    V[X] >>= 1;
+                    break;
+                case 0x7:
+                    V[0xF] = (V[Y] >= V[X]) ? 1 : 0;
+                    V[X] = V[Y] - V[X];
+                    break;
+                case 0xE:
+                    V[0xF] = (V[X] >> 7) & 1;
+                    V[X] <<= 1;
+                    break;
+            }
+            // std::cout << "8XY" << std::hex << (int)N
+            //   << "  V" << (int)X << ": " << std::dec << (int)beforeX
+            //   << " -> " << (int)V[X]
+            //   << "  (V" << (int)Y << "=" << (int)beforeY << ")"
+            //   << "  VF=" << (int)V[0xF]
+            //   << "\n";
+
+            break;
+        }
+        case 0x9000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            uint8_t Y = (opcode & 0x00F0) >> 4;
+            bool skip = (V[X] != V[Y]);
+            if (skip) pc += 2;
+            // std::cout << "9XY0: V" << (int)X << "=" << (int)V[X]
+            //         << " V" << (int)Y << "=" << (int)V[Y]
+            //         << " -> " << (skip ? "SKIP" : "no skip") << "\n";
+            //if (V[X] != V[Y]) pc += 2;
+            break;
+        }
         case 0xA000:
             I = opcode & 0x0FFF;
             break;
+        case 0xC000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            uint8_t NN = opcode & 0x00FF;
+            V[X] = (rand() % 256) & NN;
+            break;
+        }
         case 0xD000: {
             uint8_t X = (opcode & 0x0F00) >> 8;
             uint8_t Y = (opcode & 0x00F0) >> 4;
@@ -129,12 +235,65 @@ void Chip8::cycle() {
             }
             break;
         }
+        case 0xE000: {
+            uint8_t X = (opcode & 0x0F00) >> 8;
+            switch (opcode & 0x00FF) {
+                case 0x9E:  
+                    if (keypad[V[X]] != 0) pc += 2;
+                    break;
+                case 0xA1:  
+                    if (keypad[V[X]] == 0) pc += 2;
+                    break;
+            }
+            break;
+        }
         case 0xF000: {
             uint8_t X = (opcode & 0x0F00) >> 8;
             switch (opcode & 0x00FF) {
+                case 0x07:
+                    V[X] = delay_timer;
+                    break;
+                case 0x0A: {
+                    bool pressed = false;
+                    for (int i = 0; i < 16; i++) {
+                        if (keypad[i] != 0) {
+                            V[X] = i;
+                            pressed = true;
+                            break;
+                        }
+                    }
+                    if (!pressed) pc -= 2;
+                    break;
+                }
+                case 0x15:  // FX15: delay_timer = VX
+                    delay_timer = V[X];
+                    break;
+                case 0x18: 
+                    sound_timer = V[X];
+                    break;
+                case 0x1E:
+                    I += V[X];
+                    break;
                 case 0x29: 
                     I = V[X] * 5;
                     break;
+                case 0x33: {
+                    uint8_t value = V[X];
+                    memory[I] = value / 100;
+                    memory[I + 1] = (value / 10) % 10;
+                    memory[I + 2] = value % 10;
+                    break;
+                }
+                case 0x55:
+                    for (int i = 0; i <= X; i++) {
+                        memory[I + i] = V[i];
+                    }
+                    break;
+                case 0x65:  // FX65: load V0-VX
+                for (int i = 0; i <= X; i++) {
+                    V[i] = memory[I + i];
+                }
+                break;
             }
             break;
         }

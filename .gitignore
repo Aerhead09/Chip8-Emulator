@@ -1,4 +1,6 @@
-# Binaries
+# ============================================
+# Binaries & Build Output
+# ============================================
 bin/
 *.exe
 *.out
@@ -6,17 +8,28 @@ bin/
 *.obj
 *.app
 
+# ============================================
 # SDL library (jangan commit, ukurannya besar)
+# ============================================
 libs/
 
+# ============================================
+# ROM eksternal (hasil download dari internet)
+# Jangan di-commit karena berhak cipta / bukan buatan kita
+# ============================================
+games/
+demos/
+hires/
+
+# ============================================
 # IDE
+# ============================================
 .vscode/
 .idea/
 *.swp
 
+# ============================================
 # OS
+# ============================================
 .DS_Store
 Thumbs.db
-
-# Test ROMs (kalau nanti kamu download, jangan commit ROM berhak cipta)
-# Tapi ROM yang kamu bikin sendiri boleh
