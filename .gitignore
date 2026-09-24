@@ -1,0 +1,22 @@
+# Binaries
+bin/
+*.exe
+*.out
+*.o
+*.obj
+*.app
+
+# SDL library (jangan commit, ukurannya besar)
+libs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test ROMs (kalau nanti kamu download, jangan commit ROM berhak cipta)
+# Tapi ROM yang kamu bikin sendiri boleh
